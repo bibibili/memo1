@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 메모장</title>
+    <!-- Firebase SDK (글로벌 'firebase' 객체 사용을 위해 추가) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 25px;
+        }
+
+        .note-input {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 25px;
+        }
+
+        #note-content {
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        #add-note-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        #add-note-btn:hover {
+            background-color: #45a049;
+        }
+
+        .notes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .note-item {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .note-item p {
+            margin: 0;
+            color: #555;
+            white-space: pre-wrap; /* 줄 바꿈 유지 */
+        }
+
+        .note-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .note-actions button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        .edit-btn {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .edit-btn:hover {
+            background-color: #0b7dda;
+        }
+
+        .delete-btn {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background-color: #da190b;
+        }
+
+        .note-edit-area {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .save-btn {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background-color: #e68a00;
+        }
+
+        .cancel-btn {
+            background-color: #9e9e9e;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background-color: #757575;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>나의 Firebase 메모장</h1>
+        <div class="note-input">
+            <textarea id="note-content" placeholder="새 메모를 작성하세요..."></textarea>
+            <button id="add-note-btn">메모 추가</button>
+        </div>
+        <div id="notes-list" class="notes-list">
+            <!-- 메모들이 여기에 표시됩니다 -->
+        </div>
+    </div>
+
+    <script>
+        // Firebase 구성
+        const firebaseConfig = {
+          apiKey: "AIzaSyBYEFD9bZMmdmAqsalgG8A6MLkazvJB6PY",
+          authDomain: "memoo-b3eb8.firebaseapp.com",
+          projectId: "memoo-b3eb8",
+          storageBucket: "memoo-b3eb8.firebasestorage.app",
+          messagingSenderId: "63391534120",
+          appId: "1:63391534120:web:4bf394dce5017bf18cb91d",
+          measurementId: "G-H32MR91JZZ"
+        };
+
+        // Firebase 초기화
+        firebase.initializeApp(firebaseConfig);
+
+        // Firestore 인스턴스 가져오기
+        const db = firebase.firestore();
+
+        // DOM 요소 참조
+        const noteContentInput = document.getElementById('note-content');
+        const addNoteBtn = document.getElementById('add-note-btn');
+        const notesList = document.getElementById('notes-list');
+
+        // 메모 추가 함수
+        async function addNote() {
+            const content = noteContentInput.value.trim();
+            if (content === '') {
+                alert('메모 내용을 입력해주세요.');
+                return;
+            }
+
+            try {
+                await db.collection('notes').add({
+                    content: content,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp() // 서버 시간 기록
+                });
+                noteContentInput.value = ''; // 입력 필드 초기화
+                console.log('메모가 성공적으로 추가되었습니다.');
+            } catch (error) {
+                console.error('메모 추가 중 오류 발생: ', error);
+                alert('메모 추가에 실패했습니다.');
+            }
+        }
+
+        // 메모 가져오기 및 실시간 업데이트 (CRUD - Read)
+        function getNotes() {
+            db.collection('notes').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+                notesList.innerHTML = ''; // 기존 메모 목록 초기화
+                snapshot.forEach(doc => {
+                    const note = doc.data();
+                    const noteId = doc.id;
+                    const noteItem = document.createElement('div');
+                    noteItem.classList.add('note-item');
+                    noteItem.setAttribute('data-id', noteId);
+
+                    noteItem.innerHTML = `
+                        <p>${note.content}</p>
+                        <div class="note-actions">
+                            <button class="edit-btn" data-id="${noteId}">수정</button>
+                            <button class="delete-btn" data-id="${noteId}">삭제</button>
+                        </div>
+                    `;
+                    notesList.appendChild(noteItem);
+                });
+            }, error => {
+                console.error('메모 가져오기 중 오류 발생: ', error);
+                alert('메모를 불러오는데 실패했습니다.');
+            });
+        }
+
+        // 메모 삭제 함수 (CRUD - Delete)
+        async function deleteNote(id) {
+            if (!confirm('정말로 이 메모를 삭제하시겠습니까?')) {
+                return;
+            }
+            try {
+                await db.collection('notes').doc(id).delete();
+                console.log('메모가 성공적으로 삭제되었습니다.');
+            } catch (error) {
+                console.error('메모 삭제 중 오류 발생: ', error);
+                alert('메모 삭제에 실패했습니다.');
+            }
+        }
+
+        // 메모 수정 모드 활성화 (CRUD - Update)
+        function enableEditMode(noteElement, noteId, currentContent) {
+            const paragraph = noteElement.querySelector('p');
+            const actionsDiv = noteElement.querySelector('.note-actions');
+
+            paragraph.style.display = 'none'; // 기존 내용을 숨김
+
+            const editArea = document.createElement('textarea');
+            editArea.classList.add('note-edit-area');
+            editArea.value = currentContent;
+            noteElement.insertBefore(editArea, actionsDiv); // 수정 텍스트 영역 삽입
+
+            // 버튼 변경: '수정', '삭제' -> '저장', '취소'
+            actionsDiv.innerHTML = `
+                <button class="save-btn" data-id="${noteId}">저장</button>
+                <button class="cancel-btn" data-id="${noteId}">취소</button>
+            `;
+
+            // 저장 버튼 이벤트 리스너
+            actionsDiv.querySelector('.save-btn').addEventListener('click', async () => {
+                const newContent = editArea.value.trim();
+                if (newContent === '') {
+                    alert('메모 내용은 비워둘 수 없습니다.');
+                    return;
+                }
+                await updateNote(noteId, newContent);
+                // 수정 모드 해제
+                disableEditMode(noteElement, noteId, newContent);
+            });
+
+            // 취소 버튼 이벤트 리스너
+            actionsDiv.querySelector('.cancel-btn').addEventListener('click', () => {
+                disableEditMode(noteElement, noteId, currentContent); // 기존 내용으로 복원
+            });
+        }
+
+        // 메모 수정 모드 해제
+        function disableEditMode(noteElement, noteId, contentToDisplay) {
+            const paragraph = noteElement.querySelector('p');
+            const editArea = noteElement.querySelector('.note-edit-area');
+            const actionsDiv = noteElement.querySelector('.note-actions');
+
+            if (editArea) {
+                noteElement.removeChild(editArea); // 텍스트 영역 제거
+            }
+            paragraph.textContent = contentToDisplay; // 내용을 다시 표시
+            paragraph.style.display = 'block';
+
+            // 버튼을 '수정', '삭제'로 복원
+            actionsDiv.innerHTML = `
+                <button class="edit-btn" data-id="${noteId}">수정</button>
+                <button class="delete-btn" data-id="${noteId}">삭제</button>
+            `;
+        }
+
+        // 메모 업데이트 함수 (CRUD - Update)
+        async function updateNote(id, newContent) {
+            try {
+                await db.collection('notes').doc(id).update({
+                    content: newContent,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp() // 업데이트 시간 기록
+                });
+                console.log('메모가 성공적으로 업데이트되었습니다.');
+            } catch (error) {
+                console.error('메모 업데이트 중 오류 발생: ', error);
+                alert('메모 업데이트에 실패했습니다.');
+            }
+        }
+
+
+        // 이벤트 리스너 설정
+        addNoteBtn.addEventListener('click', addNote);
+
+        notesList.addEventListener('click', (event) => {
+            const target = event.target;
+            const noteId = target.dataset.id;
+            const noteItem = target.closest('.note-item'); // 가장 가까운 note-item 부모 요소를 찾음
+
+            if (target.classList.contains('delete-btn')) {
+                deleteNote(noteId);
+            } else if (target.classList.contains('edit-btn')) {
+                const currentContent = noteItem.querySelector('p').textContent;
+                enableEditMode(noteItem, noteId, currentContent);
+            }
+        });
+
+        // 페이지 로드 시 메모 가져오기
+        document.addEventListener('DOMContentLoaded', getNotes);
+    </script>
+</body>
+</html>
